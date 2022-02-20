@@ -400,9 +400,9 @@ class HLSStreamWorker(SegmentedStreamWorker):
                 # End of stream
                 stream_end = self.playlist_end and sequence.num >= self.playlist_end
                 if self.closed or stream_end:
-                    return
-
-                self.playlist_sequence = sequence.num + 1
+                    pass
+                else:
+                    self.playlist_sequence = sequence.num + 1
 
             if self.wait(self.playlist_reload_time):
                 try:
