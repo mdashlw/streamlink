@@ -1,3 +1,9 @@
+"""
+$description Live TV channels and video on-demand service from TVI, a Portuguese free-to-air broadcaster.
+$url tviplayer.iol.pt
+$type live, vod
+"""
+
 import logging
 import re
 
@@ -13,8 +19,6 @@ log = logging.getLogger(__name__)
     r"https://tviplayer\.iol\.pt/(?:direto|programa)/",
 ))
 class TVIPlayer(Plugin):
-    _re_jsonData = re.compile(r"jsonData\s*=\s*(?P<json>{.+?})\s*;", re.DOTALL)
-
     def _get_streams(self):
         self.session.http.headers.update({"Referer": "https://tviplayer.iol.pt/"})
         data = self.session.http.get(
@@ -22,19 +26,20 @@ class TVIPlayer(Plugin):
             schema=validate.Schema(
                 validate.parse_html(),
                 validate.xml_xpath_string(".//script[contains(text(),'.m3u8')]/text()"),
-                str,
-                validate.transform(self._re_jsonData.search),
-                validate.any(None, validate.all(
-                    validate.get("json"),
-                    validate.parse_json(),
-                    {
-                        "id": str,
-                        "liveType": str,
-                        "videoType": str,
-                        "videoUrl": validate.url(path=validate.endswith(".m3u8")),
-                        validate.optional("channel"): str,
-                    }
-                ))
+                validate.none_or_all(
+                    re.compile(r"jsonData\s*=\s*(?P<json>{.+?})\s*;", re.DOTALL),
+                    validate.none_or_all(
+                        validate.get("json"),
+                        validate.parse_json(),
+                        {
+                            "id": str,
+                            "liveType": str,
+                            "videoType": str,
+                            "videoUrl": validate.url(path=validate.endswith(".m3u8")),
+                            validate.optional("channel"): str,
+                        },
+                    ),
+                ),
             )
         )
         if not data:
@@ -54,8 +59,8 @@ class TVIPlayer(Plugin):
                     "code": str,
                     "error": validate.any(None, str),
                     "detail": str,
-                }
-            )
+                },
+            ),
         )
         log.debug(f"{data_geo!r}")
         if data_geo["detail"] != "ok":
@@ -64,7 +69,7 @@ class TVIPlayer(Plugin):
 
         wmsAuthSign = self.session.http.get(
             "https://services.iol.pt/matrix?userId=",
-            schema=validate.Schema(str)
+            schema=validate.Schema(str),
         )
         hls_url = update_qsd(data["videoUrl"], {"wmsAuthSign": wmsAuthSign})
         return HLSStream.parse_variant_playlist(self.session, hls_url)

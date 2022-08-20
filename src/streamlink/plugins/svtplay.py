@@ -1,8 +1,15 @@
+"""
+$description Live TV channels and video on-demand service from SVT, a Swedish public, state-owned broadcaster.
+$url svtplay.se
+$type live, vod
+$region Sweden
+"""
+
 import logging
 import re
 from urllib.parse import parse_qsl, urlparse
 
-from streamlink.plugin import Plugin, PluginArgument, PluginArguments, pluginmatcher
+from streamlink.plugin import Plugin, pluginargument, pluginmatcher
 from streamlink.plugin.api import validate
 from streamlink.stream.dash import DASHStream
 from streamlink.stream.ffmpegmux import MuxedStream
@@ -12,8 +19,12 @@ log = logging.getLogger(__name__)
 
 
 @pluginmatcher(re.compile(
-    r'https?://(?:www\.)?(?:svtplay|oppetarkiv)\.se(/(kanaler/)?.*)'
+    r'https?://(?:www\.)?svtplay\.se(/(kanaler/)?.*)'
 ))
+@pluginargument(
+    "mux-subtitles",
+    is_global=True,
+)
 class SVTPlay(Plugin):
     api_url = 'https://api.svt.se/videoplayer-api/video/{0}'
 
@@ -35,10 +46,6 @@ class SVTPlay(Plugin):
             'format': validate.text,
         }],
     })
-
-    arguments = PluginArguments(
-        PluginArgument("mux-subtitles", is_global=True)
-    )
 
     def _set_metadata(self, data, category):
         if 'programTitle' in data:

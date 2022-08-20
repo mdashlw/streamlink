@@ -40,8 +40,41 @@ html {
   font-size: 100% !important;
 }
 
+h1, h2 {
+  margin-top: 1.5rem;
+  margin-bottom: 0.75rem;
+  font-weight: 300;
+}
+h3, h4, h5, h6 {
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+  font-weight: 400;
+}
+h1 {
+  font-size: 2.25rem;
+}
+h2 {
+  font-size: 1.75rem;
+}
+h3 {
+  font-size: 1.25rem;
+}
+h4 {
+  font-size: 1rem;
+}
+h5 {
+  font-size: 0.875rem;
+}
+h6 {
+  font-size: 0.75rem;
+}
+
 code.literal {
   font-size: var(--font-size--small);
+}
+
+code.literal.xref.std-option {
+  white-space: nowrap;
 }
 
 strong.command {
@@ -50,6 +83,26 @@ strong.command {
   background: var(--color-background-secondary);
   color: var(--color-api-name);
   font: normal var(--font-size--small) var(--font-stack--monospace);
+}
+
+.highlight .go {
+  font-style: normal;
+}
+
+a[href^="http://"]:not(.muted-link),
+a[href^="https://"]:not(.muted-link):not([href^="https://streamlink.github.io/"]) {
+  display: inline-block;
+  word-break: break-word;
+}
+
+a[href^="http://"]:not(.no-external-link-icon):not(.muted-link)::after,
+a[href^="https://"]:not(.no-external-link-icon):not(.muted-link):not([href^="https://streamlink.github.io/"])::after {
+  content: "\f35d";
+  display: inline-block;
+  padding-left: .4em;
+  font: 900 .6em "Font Awesome 5 Free";
+  vertical-align: middle;
+  text-decoration: none;
 }
 
 /*
@@ -113,7 +166,7 @@ strong.command {
 }
 .sidebar-versions-others dd {
   width: 50%;
-  margin: 0;
+  margin: 0 !important;
 }
 .sidebar-versions-others dd:first-of-type {
   padding-right: .5rem;
@@ -216,6 +269,16 @@ table.table-custom-layout.table-custom-layout-platform-locations code {
   white-space: pre;
 }
 
+table.table-custom-layout.table-custom-layout-dependencies th:nth-of-type(1) {
+  width: 5rem;
+}
+table.table-custom-layout.table-custom-layout-dependencies th:nth-of-type(2) {
+  width: 12rem;
+}
+table.table-custom-layout.table-custom-layout-dependencies tbody td {
+  vertical-align: top;
+}
+
 .option .sig-name,
 .option .sig-prename {
   font-family: var(--font-stack--monospace);
@@ -232,6 +295,26 @@ table.table-custom-layout.table-custom-layout-platform-locations code {
   margin: 0 1rem 1rem 0;
 }
 .github-avatar + .container > ul > li {
+  list-style: none;
+}
+
+section#plugins dl.field-list {
+  margin: 0 0 0 1rem;
+}
+section#plugins dl.field-list > dt {
+  float: left;
+  width: 8rem;
+  margin: 0;
+}
+section#plugins dl.field-list > dd {
+  margin: 0 0 0 8rem;
+}
+section#plugins dl.field-list ul,
+section#plugins dl.field-list p {
+  margin: 0;
+  padding: 0;
+}
+section#plugins dl.field-list li {
   list-style: none;
 }
 

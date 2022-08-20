@@ -1,3 +1,10 @@
+"""
+$description US live TV channels. OTT service from USTVnow.
+$url ustvnow.com
+$type live
+$account Required, additional subscription required by some streams
+"""
+
 import base64
 import json
 import logging
@@ -9,7 +16,7 @@ from Crypto.Cipher import AES
 from Crypto.Hash import SHA256
 from Crypto.Util.Padding import pad, unpad
 
-from streamlink.plugin import Plugin, PluginArgument, PluginArguments, PluginError, pluginmatcher
+from streamlink.plugin import Plugin, PluginError, pluginargument, pluginmatcher
 from streamlink.stream.hls import HLSStream
 
 log = logging.getLogger(__name__)
@@ -18,6 +25,20 @@ log = logging.getLogger(__name__)
 @pluginmatcher(re.compile(
     r"https?://(?:www\.)?ustvnow\.com/live/(?P<scode>\w+)/-(?P<id>\d+)"
 ))
+@pluginargument(
+    "username",
+    required=True,
+    requires=["password"],
+    metavar="USERNAME",
+    help="Your USTV Now account username",
+)
+@pluginargument(
+    "password",
+    required=True,
+    sensitive=True,
+    metavar="PASSWORD",
+    help="Your USTV Now account password",
+)
 class USTVNow(Plugin):
     _main_js_re = re.compile(r"""src=['"](main\..*\.js)['"]""")
     _enc_key_re = re.compile(r'(?P<key>AES_(?:Key|IV))\s*:\s*"(?P<value>[^"]+)"')
@@ -26,23 +47,6 @@ class USTVNow(Plugin):
     _api_url = "https://teleupapi.revlet.net/service/api/v1/"
     _token_url = _api_url + "get/token"
     _signin_url = "https://www.ustvnow.com/signin"
-
-    arguments = PluginArguments(
-        PluginArgument(
-            "username",
-            metavar="USERNAME",
-            required=True,
-            help="Your USTV Now account username"
-        ),
-        PluginArgument(
-            "password",
-            sensitive=True,
-            metavar="PASSWORD",
-            required=True,
-            help="Your USTV Now account password",
-            prompt="Enter USTV Now account password"
-        )
-    )
 
     def __init__(self, url):
         super().__init__(url)

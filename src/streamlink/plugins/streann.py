@@ -1,3 +1,13 @@
+"""
+$description Global live streaming and video on-demand hosting platform.
+$url ott.streann.com
+$url centroecuador.ec
+$url columnaestilos.com
+$url evtv.online/noticias-de-venezuela
+$url telecuracao.com
+$type live, vod
+"""
+
 import base64
 import logging
 import random
@@ -5,7 +15,7 @@ import re
 import time
 from urllib.parse import urlparse
 
-from streamlink.plugin import Plugin, PluginArgument, PluginArguments, pluginmatcher
+from streamlink.plugin import Plugin, pluginargument, pluginmatcher
 from streamlink.plugin.api import validate
 from streamlink.stream.hls import HLSStream
 from streamlink.utils.crypto import decrypt_openssl
@@ -30,19 +40,13 @@ log = logging.getLogger(__name__)
         telecuracao\.com
     )
 """, re.VERBOSE))
+@pluginargument(
+    "url",
+    metavar="URL",
+    type=str,
+    help="Source URL where the iframe is located, only required for direct URLs of ott.streann.com",
+)
 class Streann(Plugin):
-    arguments = PluginArguments(
-        PluginArgument(
-            "url",
-            type=str,
-            metavar="URL",
-            help="""
-            Source URL where the iframe is located,
-            only required for direct URLs of `ott.streann.com`
-            """
-        )
-    )
-
     base_url = "https://ott.streann.com"
     get_time_url = base_url + "/web/services/public/get-server-time"
     token_url = base_url + "/loadbalancer/services/web-players/{playerId}/token/{type}/{dataId}/{deviceId}"

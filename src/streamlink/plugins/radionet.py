@@ -1,3 +1,18 @@
+"""
+$description Global and country-specific websites for live radio simulcasts for over 40,000 stations.
+$url radio.net
+$url radio.at
+$url radio.de
+$url radio.dk
+$url radio.es
+$url radio.fr
+$url radio.it
+$url radio.pl
+$url radio.pt
+$url radio.se
+$type live
+"""
+
 import logging
 import re
 from urllib.parse import urlparse, urlunparse
@@ -14,28 +29,21 @@ log = logging.getLogger(__name__)
     r"https?://(\w+)\.radio\.(net|at|de|dk|es|fr|it|pl|pt|se)"
 ))
 class RadioNet(Plugin):
-    _stream_data_re = re.compile(r'\bstation\s*:\s*(\{.+\}),?\s*')
-
-    _stream_schema = validate.Schema(
-        validate.transform(_stream_data_re.search),
-        validate.any(
-            None,
-            validate.all(
+    def _get_streams(self):
+        streams = self.session.http.get(self.url, schema=validate.Schema(
+            re.compile(r"\bstation\s*:\s*(\{.+}),?\s*"),
+            validate.none_or_all(
                 validate.get(1),
                 validate.parse_json(),
                 {
-                    'type': validate.text,
-                    'streams': validate.all([{
-                        'url': validate.url(),
-                        'contentFormat': validate.text,
-                    }])
+                    "type": str,
+                    "streams": [{
+                        "url": validate.url(),
+                        "contentFormat": str,
+                    }],
                 },
-            )
-        )
-    )
-
-    def _get_streams(self):
-        streams = self.session.http.get(self.url, schema=self._stream_schema)
+            ),
+        ))
         if streams is None:
             return
 

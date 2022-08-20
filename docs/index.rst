@@ -36,7 +36,7 @@ to be easily added. Most of the big streaming services are supported, such as:
 - `Dailymotion.com <https://www.dailymotion.com/live>`_
 
 ... and many more. A full list of plugins currently included can be found
-on the :ref:`Plugins <plugin_matrix:Plugins>` page.
+on the :ref:`Plugins <plugins:Plugins>` page.
 
 Quickstart
 ----------
@@ -64,6 +64,7 @@ Thank you
 
 - `Github <https://github.com/>`_, for hosting the git repo, docs, release assets and providing CI tools
 - `Netlify <https://netlify.com/>`_, for hosting docs preview builds
+- `Whatismybrowser <https://whatismybrowser.com>`_, for the access to their user-agents API in our CI workflows
 
 
 Table of contents
@@ -75,7 +76,7 @@ Table of contents
     Overview <self>
     install
     cli
-    plugin_matrix
+    plugins
     players
     issues
     deprecations

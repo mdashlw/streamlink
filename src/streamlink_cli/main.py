@@ -3,9 +3,9 @@ import errno
 import logging
 import os
 import platform
+import re
 import signal
 import sys
-from collections import OrderedDict
 from contextlib import closing
 from distutils.version import StrictVersion
 from functools import partial
@@ -13,40 +13,43 @@ from gettext import gettext
 from itertools import chain
 from pathlib import Path
 from time import sleep
-from typing import Dict, List, Type
+from typing import Any, Dict, Iterator, List, Optional, Type, Union
 
 import requests
-from socks import __version__ as socks_version
-from websocket import __version__ as websocket_version
 
 import streamlink.logger as logger
 from streamlink import NoPluginError, PluginError, StreamError, Streamlink, __version__ as streamlink_version
 from streamlink.cache import Cache
+from streamlink.compat import is_win32
 from streamlink.exceptions import FatalPluginError
 from streamlink.plugin import Plugin, PluginOptions
 from streamlink.stream.stream import Stream, StreamIO
 from streamlink.utils.named_pipe import NamedPipe
-from streamlink_cli.argparser import build_parser
-from streamlink_cli.compat import DeprecatedPath, is_win32, stdout
+from streamlink_cli.argparser import ArgumentParser, build_parser
+from streamlink_cli.compat import DeprecatedPath, importlib_metadata, stdout
 from streamlink_cli.console import ConsoleOutput, ConsoleUserInputRequester
 from streamlink_cli.constants import CONFIG_FILES, DEFAULT_STREAM_METADATA, LOG_DIR, PLUGIN_DIRS, STREAM_SYNONYMS
-from streamlink_cli.output import FileOutput, Output, PlayerOutput
-from streamlink_cli.utils import Formatter, HTTPServer, datetime, ignored, progress, stream_to_url
+from streamlink_cli.output import FileOutput, PlayerOutput
+from streamlink_cli.utils import Formatter, HTTPServer, datetime, ignored
+from streamlink_cli.utils.progress import Progress
+from streamlink_cli.utils.terminal import TerminalOutput
+
 
 ACCEPTABLE_ERRNO = (errno.EPIPE, errno.EINVAL, errno.ECONNRESET)
 try:
-    ACCEPTABLE_ERRNO += (errno.WSAECONNABORTED,)
+    ACCEPTABLE_ERRNO += (errno.WSAECONNABORTED,)  # type: ignore
 except AttributeError:
     pass  # Not windows
+
 QUIET_OPTIONS = ("json", "stream_url", "quiet")
 
-args = None
-console: ConsoleOutput = None
-output: Output = None
-stream_fd: StreamIO = None
-streamlink: Streamlink = None
 
-Streams = Dict[str, Stream]
+args: Any = None  # type: ignore[assignment]
+console: ConsoleOutput = None  # type: ignore[assignment]
+output: Union[FileOutput, PlayerOutput] = None  # type: ignore[assignment]
+stream_fd: StreamIO = None  # type: ignore[assignment]
+streamlink: Streamlink = None  # type: ignore[assignment]
+
 
 log = logging.getLogger("streamlink.cli")
 
@@ -55,6 +58,7 @@ def get_formatter(plugin: Plugin):
     return Formatter(
         {
             "url": lambda: args.url,
+            "plugin": lambda: plugin.module,
             "id": lambda: plugin.get_id(),
             "author": lambda: plugin.get_author(),
             "category": lambda: plugin.get_category(),
@@ -78,7 +82,7 @@ def check_file_output(path: Path, force):
     if path.is_file() and not force:
         if sys.stdin.isatty():
             answer = console.ask(f"File {path} already exists! Overwrite it? [y/N] ")
-            if answer.lower() != "y":
+            if not answer or answer.lower() != "y":
                 sys.exit()
         else:
             log.error(f"File {path} already exists, use --force to overwrite it.")
@@ -87,7 +91,7 @@ def check_file_output(path: Path, force):
     return FileOutput(path)
 
 
-def create_output(formatter: Formatter):
+def create_output(formatter: Formatter) -> Union[FileOutput, PlayerOutput]:
     """Decides where to write the stream.
 
     Depending on arguments it can be one of these:
@@ -100,17 +104,21 @@ def create_output(formatter: Formatter):
 
     if (args.output or args.stdout) and (args.record or args.record_and_pipe):
         console.exit("Cannot use record options with other file output options.")
+        return  # type: ignore
 
     if args.output:
         if args.output == "-":
-            out = FileOutput(fd=stdout)
+            return FileOutput(fd=stdout)
         else:
-            out = check_file_output(formatter.path(args.output, args.fs_safe_rules), args.force)
+            return check_file_output(formatter.path(args.output, args.fs_safe_rules), args.force)
+
     elif args.stdout:
-        out = FileOutput(fd=stdout)
+        return FileOutput(fd=stdout)
+
     elif args.record_and_pipe:
         record = check_file_output(formatter.path(args.record_and_pipe, args.fs_safe_rules), args.force)
-        out = FileOutput(fd=stdout, record=record)
+        return FileOutput(fd=stdout, record=record)
+
     elif not args.player:
         console.exit(
             "The default player (VLC) does not seem to be "
@@ -119,23 +127,29 @@ def create_output(formatter: Formatter):
             "stream with --output, or pipe the stream to "
             "another program with --stdout."
         )
+        return  # type: ignore
+
     else:
         http = namedpipe = record = None
 
         if args.player_fifo:
             try:
-                namedpipe = NamedPipe()
+                namedpipe = NamedPipe()  # type: ignore[abstract]  # ???
             except OSError as err:
                 console.exit(f"Failed to create pipe: {err}")
+                return  # type: ignore
         elif args.player_http:
             http = create_http_server()
 
         if args.record:
-            record = check_file_output(formatter.path(args.record, args.fs_safe_rules), args.force)
+            if args.record == "-":
+                record = FileOutput(fd=stdout)
+            else:
+                record = check_file_output(formatter.path(args.record, args.fs_safe_rules), args.force)
 
         log.info(f"Starting player: {args.player}")
 
-        out = PlayerOutput(
+        return PlayerOutput(
             args.player,
             args=args.player_args,
             quiet=not args.verbose_player,
@@ -146,11 +160,9 @@ def create_output(formatter: Formatter):
             title=formatter.title(args.title, defaults=DEFAULT_STREAM_METADATA) if args.title else args.url
         )
 
-    return out
-
 
 def create_http_server(*_args, **_kwargs):
-    """Creates a HTTP server listening on a given host and port.
+    """Creates an HTTP server listening on a given host and port.
 
     If host is empty, listen on all available interfaces, and if port is 0,
     listen on a random high port.
@@ -161,6 +173,7 @@ def create_http_server(*_args, **_kwargs):
         http.bind(*_args, **_kwargs)
     except OSError as err:
         console.exit(f"Failed to create HTTP server: {err}")
+        return
 
     return http
 
@@ -179,7 +192,13 @@ def iter_http_requests(server, player):
             continue
 
 
-def output_stream_http(plugin: Plugin, initial_streams: Streams, formatter: Formatter, external=False, port=0):
+def output_stream_http(
+    plugin: Plugin,
+    initial_streams: Dict[str, Stream],
+    formatter: Formatter,
+    external: bool = False,
+    port: int = 0,
+):
     """Continuously output the stream over HTTP."""
     global output
 
@@ -212,6 +231,7 @@ def output_stream_http(plugin: Plugin, initial_streams: Streams, formatter: Form
         for url in server.urls:
             log.info(" " + url)
 
+    initial_streams_used = False
     for req in iter_http_requests(server, player):
         user_agent = req.headers.get("User-Agent") or "unknown player"
         log.info(f"Got HTTP request from {user_agent}")
@@ -219,8 +239,11 @@ def output_stream_http(plugin: Plugin, initial_streams: Streams, formatter: Form
         stream_fd = prebuffer = None
         while not stream_fd and (not player or player.running):
             try:
-                streams = initial_streams or fetch_streams(plugin)
-                initial_streams = None
+                if not initial_streams_used:
+                    streams = initial_streams
+                    initial_streams_used = True
+                else:
+                    streams = fetch_streams(plugin)
 
                 for stream_name in (resolve_stream_name(streams, s) for s in args.stream):
                     if stream_name in streams:
@@ -246,7 +269,8 @@ def output_stream_http(plugin: Plugin, initial_streams: Streams, formatter: Form
 
         server.close(True)
 
-    player.close()
+    if player:
+        player.close()
     server.close()
 
 
@@ -254,11 +278,16 @@ def output_stream_passthrough(stream, formatter: Formatter):
     """Prepares a filename to be passed to the player."""
     global output
 
-    filename = f'"{stream_to_url(stream)}"'
+    try:
+        url = stream.to_url()
+    except TypeError:
+        console.exit("The stream specified cannot be translated to a URL")
+        return False
+
     output = PlayerOutput(
         args.player,
         args=args.player_args,
-        filename=filename,
+        filename=f'"{url}"',
         call=True,
         quiet=not args.verbose_player,
         title=formatter.title(args.title, defaults=DEFAULT_STREAM_METADATA) if args.title else args.url
@@ -329,8 +358,11 @@ def output_stream(stream, formatter: Formatter):
     except OSError as err:
         if isinstance(output, PlayerOutput):
             console.exit(f"Failed to start player: {args.player} ({err})")
-        else:
+        elif output.filename:
             console.exit(f"Failed to open output: {output.filename} ({err})")
+        else:
+            console.exit(f"Failed to open output ({err}")
+        return
 
     with closing(output):
         log.debug("Writing stream to output")
@@ -356,20 +388,14 @@ def read_stream(stream, output, prebuffer, formatter: Formatter, chunk_size=8192
         and (sys.stdout.isatty() or args.force_progress)
     )
 
-    stream_iterator = chain(
+    progress: Optional[Progress] = None
+    stream_iterator: Iterator = chain(
         [prebuffer],
         iter(partial(stream.read, chunk_size), b"")
     )
-    if show_progress:
-        stream_iterator = progress(
-            stream_iterator,
-            prefix=os.path.basename(output.filename)
-        )
-    elif show_record_progress:
-        stream_iterator = progress(
-            stream_iterator,
-            prefix=os.path.basename(output.record.filename)
-        )
+    if show_progress or show_record_progress:
+        progress = Progress(output=TerminalOutput(sys.stderr))
+        stream_iterator = progress.iter(stream_iterator)
 
     try:
         for data in stream_iterator:
@@ -397,11 +423,13 @@ def read_stream(stream, output, prebuffer, formatter: Formatter, chunk_size=8192
     except OSError as err:
         console.exit(f"Error when reading from stream: {err}, exiting")
     finally:
+        if progress:
+            progress.close()
         stream.close()
         log.info("Stream ended")
 
 
-def handle_stream(plugin: Plugin, streams: Streams, stream_name: str) -> None:
+def handle_stream(plugin: Plugin, streams: Dict[str, Stream], stream_name: str) -> None:
     """Decides what to do with the selected stream.
 
     Depending on arguments it can be one of these:
@@ -458,14 +486,14 @@ def handle_stream(plugin: Plugin, streams: Streams, stream_name: str) -> None:
                 break
 
 
-def fetch_streams(plugin: Plugin) -> Streams:
+def fetch_streams(plugin: Plugin) -> Dict[str, Stream]:
     """Fetches streams using correct parameters."""
 
     return plugin.streams(stream_types=args.stream_types,
                           sorting_excludes=args.stream_sorting_excludes)
 
 
-def fetch_streams_with_retry(plugin: Plugin, interval: float, count: int) -> Streams:
+def fetch_streams_with_retry(plugin: Plugin, interval: float, count: int) -> Optional[Dict[str, Stream]]:
     """Attempts to fetch streams repeatedly
        until some are returned or limit hit."""
 
@@ -497,7 +525,7 @@ def fetch_streams_with_retry(plugin: Plugin, interval: float, count: int) -> Str
     return streams
 
 
-def resolve_stream_name(streams: Streams, stream_name: str) -> str:
+def resolve_stream_name(streams: Dict[str, Stream], stream_name: str) -> str:
     """Returns the real stream name of a synonym."""
 
     if stream_name in STREAM_SYNONYMS and stream_name in streams:
@@ -508,7 +536,7 @@ def resolve_stream_name(streams: Streams, stream_name: str) -> str:
     return stream_name
 
 
-def format_valid_streams(plugin: Plugin, streams: Streams) -> str:
+def format_valid_streams(plugin: Plugin, streams: Dict[str, Stream]) -> str:
     """Formats a dict of streams.
 
     Filters out synonyms and displays them next to
@@ -571,7 +599,7 @@ def handle_url():
     except NoPluginError:
         console.exit(f"No plugin can handle URL: {args.url}")
     except PluginError as err:
-        console.exit(err)
+        console.exit(str(err))
 
     if not streams:
         console.exit(f"No playable streams found on this URL: {args.url}")
@@ -587,16 +615,16 @@ def handle_url():
                 handle_stream(plugin, streams, stream_name)
                 return
 
-        err = f"The specified stream(s) '{', '.join(args.stream)}' could not be found"
+        errmsg = f"The specified stream(s) '{', '.join(args.stream)}' could not be found"
         if args.json:
             console.msg_json(
                 plugin=plugin.module,
                 metadata=plugin.get_metadata(),
                 streams=streams,
-                error=err
+                error=errmsg
             )
         else:
-            console.exit(f"{err}.\n       Available streams: {validstreams}")
+            console.exit(f"{errmsg}.\n       Available streams: {validstreams}")
     elif args.json:
         console.msg_json(
             plugin=plugin.module,
@@ -826,15 +854,15 @@ def setup_options():
     streamlink.set_option("locale", args.locale)
 
 
-def setup_plugin_args(session, parser):
+def setup_plugin_args(session: Streamlink, parser: ArgumentParser):
     """Sets Streamlink plugin options."""
 
     plugin_args = parser.add_argument_group("Plugin options")
     for pname, plugin in session.plugins.items():
         defaults = {}
-        group = plugin_args.add_argument_group(pname.capitalize())
+        group = parser.add_argument_group(pname.capitalize(), parent=plugin_args)
 
-        for parg in plugin.arguments:
+        for parg in plugin.arguments or []:
             if not parg.is_global:
                 group.add_argument(parg.argument_name(pname), **parg.options)
                 defaults[parg.dest] = parg.default
@@ -856,8 +884,11 @@ def setup_plugin_args(session, parser):
 
 def setup_plugin_options(session: Streamlink, plugin: Type[Plugin]):
     """Sets Streamlink plugin options."""
+    if plugin.arguments is None:
+        return
+
     pname = plugin.module
-    required = OrderedDict({})
+    required = {}
 
     for parg in plugin.arguments:
         if parg.options.get("help") == argparse.SUPPRESS:
@@ -890,7 +921,7 @@ def setup_plugin_options(session: Streamlink, plugin: Type[Plugin]):
 
 
 def log_root_warning():
-    if hasattr(os, "getuid"):
+    if hasattr(os, "geteuid"):  # pragma: no branch
         if os.geteuid() == 0:
             log.info("streamlink is running as root! Be careful!")
 
@@ -913,19 +944,30 @@ def log_current_versions():
     log.debug(f"OS:         {os_version}")
     log.debug(f"Python:     {platform.python_version()}")
     log.debug(f"Streamlink: {streamlink_version}")
-    log.debug(f"Requests({requests.__version__}), "
-              f"Socks({socks_version}), "
-              f"Websocket({websocket_version})")
+
+    # https://peps.python.org/pep-0508/#names
+    re_name = re.compile(r"[A-Z\d](?:[A-Z\d._-]*[A-Z\d])?", re.IGNORECASE)
+    log.debug("Dependencies:")
+    for name in [
+        match.group(0)
+        for match in map(re_name.match, importlib_metadata.requires("streamlink"))
+        if match is not None
+    ]:
+        try:
+            version = importlib_metadata.version(name)
+        except importlib_metadata.PackageNotFoundError:
+            continue
+        log.debug(f" {name}: {version}")
 
 
-def log_current_arguments(session, parser):
+def log_current_arguments(session: Streamlink, parser: argparse.ArgumentParser):
     global args
     if not logger.root.isEnabledFor(logging.DEBUG):
         return
 
     sensitive = set()
     for pname, plugin in session.plugins.items():
-        for parg in plugin.arguments:
+        for parg in plugin.arguments or []:
             if parg.sensitive:
                 sensitive.add(parg.argument_name(pname))
 
@@ -1002,7 +1044,7 @@ def main():
 
     # Console output should be on stderr if we are outputting
     # a stream to stdout.
-    if args.stdout or args.output == "-" or args.record_and_pipe:
+    if args.stdout or args.output == "-" or args.record == "-" or args.record_and_pipe:
         console_out = sys.stderr
     else:
         console_out = sys.stdout

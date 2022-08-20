@@ -1,7 +1,8 @@
 import locale
 import logging
+from typing import Optional
 
-from pycountry import countries, languages
+from pycountry import countries, languages  # type: ignore[import]
 
 DEFAULT_LANGUAGE = "en"
 DEFAULT_COUNTRY = "US"
@@ -99,11 +100,15 @@ class Localization:
         self.country = None
         self.language = None
         self.explicit = bool(language_code)
-        self.language_code = language_code
+        self._set_language_code(language_code)
 
     @property
     def language_code(self):
         return self._language_code
+
+    @language_code.setter
+    def language_code(self, language_code):
+        self._set_language_code(language_code)
 
     def _parse_locale_code(self, language_code):
         parts = language_code.split("_", 1)
@@ -111,12 +116,11 @@ class Localization:
             raise LookupError(f"Invalid language code: {language_code}")
         return self.get_language(parts[0]), self.get_country(parts[1])
 
-    @language_code.setter
-    def language_code(self, language_code):
+    def _set_language_code(self, language_code):
         is_system_locale = language_code is None
-        if language_code is None:
+        if is_system_locale:
             try:
-                language_code, _ = locale.getdefaultlocale()
+                language_code, _ = locale.getlocale()
             except ValueError:
                 language_code = None
             if language_code is None or language_code == "C":
@@ -127,25 +131,23 @@ class Localization:
             self.language, self.country = self._parse_locale_code(language_code)
             self._language_code = language_code
         except LookupError:
-            if is_system_locale:
-                # If the system locale returns an invalid code, use the default
-                self.language = self.get_language(DEFAULT_LANGUAGE)
-                self.country = self.get_country(DEFAULT_COUNTRY)
-                self._language_code = DEFAULT_LANGUAGE_CODE
-            else:
+            if not is_system_locale:
                 raise
+            # If the system locale returns an invalid code, use the default
+            self.language = self.get_language(DEFAULT_LANGUAGE)
+            self.country = self.get_country(DEFAULT_COUNTRY)
+            self._language_code = DEFAULT_LANGUAGE_CODE
         log.debug(f"Language code: {self._language_code}")
 
-    def equivalent(self, language=None, country=None):
-        equivalent = True
+    def equivalent(self, language: Optional[str] = None, country: Optional[str] = None) -> bool:
         try:
-            equivalent = equivalent and (not language or self.language == self.get_language(language))
-            equivalent = equivalent and (not country or self.country == self.get_country(country))
+            return (
+                (not language or self.language == self.get_language(language))
+                and (not country or self.country == self.get_country(country))
+            )
         except LookupError:
-            # if an unknown language/country code is given they cannot equivalent
+            # if an unknown language/country code is given, they cannot be equivalent
             return False
-
-        return equivalent
 
     @classmethod
     def get_country(cls, country):

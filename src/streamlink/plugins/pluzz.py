@@ -1,9 +1,17 @@
+"""
+$description Live TV channels and video on-demand service from france.tv, a French public, state-owned broadcaster.
+$url france.tv
+$url francetvinfo.fr
+$type live, vod
+$region France, Andorra, Monaco
+"""
+
 import logging
 import re
 from datetime import datetime
 from urllib.parse import urlparse
 
-from isodate import LOCAL as LOCALTIMEZONE
+from isodate import LOCAL as LOCALTIMEZONE  # type: ignore[import]
 
 from streamlink.plugin import Plugin, PluginError, pluginmatcher
 from streamlink.plugin.api import useragents, validate
@@ -25,9 +33,6 @@ class Pluzz(Plugin):
     PLAYER_VERSION = "5.51.35"
     GEO_URL = "https://geoftv-a.akamaihd.net/ws/edgescape.json"
     API_URL = "https://player.webservices.francetelevisions.fr/v1/videos/{video_id}"
-
-    _re_ftv_player_videos = re.compile(r"window\.FTVPlayerVideos\s*=\s*(?P<json>\[{.+?}])\s*;\s*(?:$|var)", re.DOTALL)
-    _re_player_load = re.compile(r"""player\.load\s*\(\s*{\s*src\s*:\s*(['"])(?P<video_id>.+?)\1\s*}\s*\)\s*;""")
 
     def _get_streams(self):
         self.session.http.headers.update({
@@ -54,27 +59,32 @@ class Pluzz(Plugin):
                     validate.all(
                         validate.xml_xpath_string(".//script[contains(text(),'window.FTVPlayerVideos')][1]/text()"),
                         str,
-                        validate.transform(self._re_ftv_player_videos.search),
+                        validate.regex(re.compile(
+                            r"window\.FTVPlayerVideos\s*=\s*(?P<json>\[{.+?}])\s*;\s*(?:$|var)",
+                            re.DOTALL,
+                        )),
                         validate.get("json"),
                         validate.parse_json(),
                         [{"videoId": str}],
-                        validate.get((0, "videoId"))
+                        validate.get((0, "videoId")),
                     ),
                     validate.all(
                         validate.xml_xpath_string(".//script[contains(text(),'new Magnetoscope')][1]/text()"),
                         str,
-                        validate.transform(self._re_player_load.search),
-                        validate.get("video_id")
+                        validate.regex(re.compile(
+                            r"""player\.load\s*\(\s*{\s*src\s*:\s*(?P<q>['"])(?P<video_id>.+?)(?P=q)\s*}\s*\)\s*;"""
+                        )),
+                        validate.get("video_id"),
                     ),
                     validate.all(
                         validate.xml_xpath_string(".//*[@id][contains(@class,'francetv-player-wrapper')][1]/@id"),
-                        str
+                        str,
                     ),
                     validate.all(
                         validate.xml_xpath_string(".//*[@data-id][@class='magneto'][1]/@data-id"),
-                        str
-                    )
-                )
+                        str,
+                    ),
+                ),
             ))
         except PluginError:
             pass

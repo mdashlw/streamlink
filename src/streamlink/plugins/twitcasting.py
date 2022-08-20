@@ -1,13 +1,18 @@
+"""
+$description Global live broadcasting and live broadcast archiving social platform.
+$url twitcasting.tv
+$type live
+"""
+
 import hashlib
 import logging
 import re
 
 from streamlink.buffers import RingBuffer
-from streamlink.plugin import Plugin, PluginArgument, PluginArguments, PluginError, pluginmatcher
+from streamlink.plugin import Plugin, PluginError, pluginargument, pluginmatcher
 from streamlink.plugin.api import validate
 from streamlink.plugin.api.websocket import WebsocketClient
-from streamlink.stream.stream import Stream
-from streamlink.stream.stream import StreamIO
+from streamlink.stream.stream import Stream, StreamIO
 from streamlink.utils.url import update_qsd
 
 
@@ -17,15 +22,13 @@ log = logging.getLogger(__name__)
 @pluginmatcher(re.compile(
     r"https?://twitcasting\.tv/(?P<channel>[^/]+)"
 ))
+@pluginargument(
+    "password",
+    sensitive=True,
+    metavar="PASSWORD",
+    help="Password for private Twitcasting streams.",
+)
 class TwitCasting(Plugin):
-    arguments = PluginArguments(
-        PluginArgument(
-            "password",
-            sensitive=True,
-            metavar="PASSWORD",
-            help="Password for private Twitcasting streams."
-        )
-    )
     _STREAM_INFO_URL = "https://twitcasting.tv/streamserver.php?target={channel}&mode=client"
     _STREAM_REAL_URL = "{proto}://{host}/ws.app/stream/{movie_id}/fmp4/bd/1/1500?mode={mode}"
 
@@ -97,7 +100,10 @@ class TwitCastingWsClient(WebsocketClient):
         super().on_close(*args, **kwargs)
         self.buffer.close()
 
-    def on_message(self, wsapp, data: str) -> None:
+    def on_data(self, wsapp, data, data_type, cont):
+        if data_type == self.OPCODE_TEXT:
+            return
+
         try:
             self.buffer.write(data)
         except Exception as err:
@@ -142,8 +148,8 @@ class TwitCastingStream(Stream):
         super().__init__(session)
         self.url = url
 
-    def __repr__(self):
-        return f"<TwitCastingStream({self.url!r})>"
+    def to_url(self):
+        return self.url
 
     def open(self):
         reader = TwitCastingReader(self)

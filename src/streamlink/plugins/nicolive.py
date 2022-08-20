@@ -1,8 +1,18 @@
+"""
+$description Japanese live-streaming and video hosting social platform.
+$url live.nicovideo.jp
+$type live, vod
+$account Required by some streams
+$notes Timeshift is supported
+"""
+
 import logging
 import re
 from threading import Event
+from urllib.parse import urljoin
 
-from streamlink.plugin import Plugin, PluginArgument, PluginArguments, PluginError, pluginmatcher
+from streamlink.exceptions import FatalPluginError
+from streamlink.plugin import Plugin, PluginError, pluginargument, pluginmatcher
 from streamlink.plugin.api import useragents, validate
 from streamlink.plugin.api.websocket import WebsocketClient
 from streamlink.stream.hls import HLSStream, HLSStreamReader
@@ -107,46 +117,50 @@ class NicoLiveHLSStream(HLSStream):
 @pluginmatcher(re.compile(
     r"https?://(?P<domain>live\d*\.nicovideo\.jp)/watch/(lv|co)\d+"
 ))
-class NicoLive(Plugin):
-    arguments = PluginArguments(
-        PluginArgument(
-            "email",
-            argument_name="niconico-email",
-            sensitive=True,
-            metavar="EMAIL",
-            help="The email or phone number associated with your Niconico account"
-        ),
-        PluginArgument(
-            "password",
-            argument_name="niconico-password",
-            sensitive=True,
-            metavar="PASSWORD",
-            help="The password of your Niconico account"
-        ),
-        PluginArgument(
-            "user-session",
-            argument_name="niconico-user-session",
-            sensitive=True,
-            metavar="VALUE",
-            help="Value of the user-session token \n(can be used in "
-                 "case you do not want to put your password here)"
-        ),
-        PluginArgument(
-            "purge-credentials",
-            argument_name="niconico-purge-credentials",
-            action="store_true",
-            help="Purge cached Niconico credentials to initiate a new session and reauthenticate."
-        ),
-        PluginArgument(
-            "timeshift-offset",
-            type=hours_minutes_seconds,
-            argument_name="niconico-timeshift-offset",
-            metavar="[HH:]MM:SS",
-            default=None,
-            help="Amount of time to skip from the beginning of a stream. Default is 00:00:00."
-        )
-    )
+@pluginargument(
+    "email",
+    sensitive=True,
+    argument_name="niconico-email",
+    metavar="EMAIL",
+    help="The email or phone number associated with your Niconico account",
+)
+@pluginargument(
+    "password",
+    sensitive=True,
+    argument_name="niconico-password",
+    metavar="PASSWORD",
+    help="The password of your Niconico account",
+)
+@pluginargument(
+    "user-session",
+    sensitive=True,
+    argument_name="niconico-user-session",
+    metavar="VALUE",
+    help="""
+        Value of the user-session token.
 
+        Can be used as an alternative to providing a password.
+    """,
+)
+@pluginargument(
+    "purge-credentials",
+    argument_name="niconico-purge-credentials",
+    action="store_true",
+    help="Purge cached Niconico credentials to initiate a new session and reauthenticate.",
+)
+@pluginargument(
+    "timeshift-offset",
+    type=hours_minutes_seconds,
+    argument_name="niconico-timeshift-offset",
+    metavar="[HH:]MM:SS",
+    default=None,
+    help="""
+        Amount of time to skip from the beginning of a stream.
+
+        Default is 00:00:00.
+    """,
+)
+class NicoLive(Plugin):
     STREAM_READY_TIMEOUT = 6
     LOGIN_URL = "https://account.nicovideo.jp/login/redirector"
     LOGIN_URL_PARAMS = {
@@ -186,7 +200,7 @@ class NicoLive(Plugin):
 
         offset = self.get_option("timeshift-offset")
         if offset and "timeshift" in wss_api_url:
-            hls_stream_url = update_qsd(self.hls_stream_url, {"start": offset})
+            hls_stream_url = update_qsd(hls_stream_url, {"start": offset})
 
         for quality, stream in NicoLiveHLSStream.parse_variant_playlist(self.session, hls_stream_url).items():
             stream.set_wsclient(self.wsclient)
@@ -246,19 +260,45 @@ class NicoLive(Plugin):
 
         elif email is not None and password is not None:
             log.info("Logging in via provided email and password")
-            msg = self.session.http.post(
+            root = self.session.http.post(
                 self.LOGIN_URL,
                 data={"mail_tel": email, "password": password},
                 params=self.LOGIN_URL_PARAMS,
-                schema=validate.Schema(
-                    validate.parse_html(),
-                    validate.xml_xpath_string(".//p[@class='notice__text']/text()")
-                )
+                schema=validate.Schema(validate.parse_html()),
             )
 
+            if self.session.http.cookies.get("user_session"):
+                log.info("Logged in.")
+                self.save_cookies()
+                return
+
+            input_with_value = {}
+            for elem in root.xpath(".//form[@action]//input"):
+                if elem.attrib.get("value"):
+                    input_with_value[elem.attrib.get("name")] = elem.attrib.get("value")
+                else:
+                    if elem.attrib.get("id") == "oneTimePw":
+                        maxlength = int(elem.attrib.get("maxlength"))
+                        try:
+                            oneTimePw = self.input_ask("Enter the 6 digit number included in email")
+                            if len(oneTimePw) > maxlength:
+                                log.error("invalid user input")
+                                return
+                        except FatalPluginError:
+                            return
+                        input_with_value[elem.attrib.get("name")] = oneTimePw
+                    else:
+                        log.debug(f"unknown input: {elem.attrib.get('name')}")
+
+            root = self.session.http.post(
+                urljoin("https://account.nicovideo.jp", root.xpath("string(.//form[@action]/@action)")),
+                data=input_with_value,
+                schema=validate.Schema(validate.parse_html()),
+            )
             log.debug(f"Cookies: {self.session.http.cookies.get_dict()}")
             if self.session.http.cookies.get("user_session") is None:
-                log.warning(f"Login failed: {msg or 'unknown reason'}")
+                error = root.xpath("string(//div[@class='formError']/div/text())")
+                log.warning(f"Login failed: {error or 'unknown reason'}")
             else:
                 log.info("Logged in.")
                 self.save_cookies()

@@ -15,7 +15,9 @@ Method                               Installing
 ==================================== ===========================================
 Installers                           See the `Windows binaries`_ section below
 
-Portable                             See the `Windows portable version`_ section below
+Portable                             See the `Windows binaries`_ section below
+
+Nightly builds                       See the `Windows nightly builds`_ section below
 
 Python pip                           See the `PyPI package and source code`_ section below
 
@@ -25,6 +27,13 @@ Python pip                           See the `PyPI package and source code`_ sec
 
                                      `Installing Chocolatey packages`_
 
+`Scoop`_                             .. code-block::
+
+                                        scoop bucket add extras
+                                        scoop install streamlink
+
+                                     `Installing Scoop packages`_
+
 `Windows Package Manager`_           .. code-block:: bat
 
                                         winget install streamlink
@@ -33,11 +42,10 @@ Python pip                           See the `PyPI package and source code`_ sec
 ==================================== ===========================================
 
 .. _Chocolatey: https://chocolatey.org/packages/streamlink
-
+.. _Scoop: https://scoop.sh/#/apps?q=streamlink&s=0&d=1&o=true
 .. _Windows Package Manager: https://github.com/microsoft/winget-pkgs/tree/master/manifests/s/Streamlink/Streamlink
-
 .. _Installing Chocolatey packages: https://chocolatey.org
-
+.. _Installing Scoop packages: https://scoop.sh
 .. _Installing Winget packages: https://docs.microsoft.com/en-us/windows/package-manager/
 
 macOS
@@ -57,7 +65,7 @@ Python pip                           See the `PyPI package and source code`_ sec
                                      `Installing Homebrew packages`_
 ==================================== ===========================================
 
-.. _Homebrew: https://github.com/Homebrew/homebrew-core/blob/master/Formula/streamlink.rb
+.. _Homebrew: https://formulae.brew.sh/formula/streamlink
 .. _Installing Homebrew packages: https://brew.sh
 
 
@@ -93,10 +101,10 @@ Python pip                           See the `PyPI package and source code`_ sec
 `Debian (stable)`_                   .. code-block:: bash
 
                                         # If you don't have Debian backports already (see link below):
-                                        echo "deb http://deb.debian.org/debian buster-backports main" | sudo tee "/etc/apt/sources.list.d/streamlink.list"
+                                        echo "deb http://deb.debian.org/debian bullseye-backports main" | sudo tee "/etc/apt/sources.list.d/streamlink.list"
 
                                         sudo apt update
-                                        sudo apt -t buster-backports install streamlink
+                                        sudo apt -t bullseye-backports install streamlink
 
                                      `Installing Debian backported packages`_
 
@@ -119,27 +127,18 @@ Python pip                           See the `PyPI package and source code`_ sec
 
                                      `NixOS channel`_
 
-`OpenBSD`_                           .. code-block:: bash
+`openSUSE`_                          .. code-block:: bash
 
-                                        doas pkg_add streamlink
+                                        sudo zypper install streamlink
 
 `Solus`_                             .. code-block:: bash
 
                                         sudo eopkg install streamlink
 
-`Ubuntu`_                            .. code-block:: bash
-
-                                        sudo add-apt-repository ppa:nilarimogard/webupd8
-                                        sudo apt update
-                                        sudo apt install streamlink
-
 `Void`_                              .. code-block:: bash
 
                                         sudo xbps-install streamlink
 ==================================== ===========================================
-
-Please see the `PyPI package and source code`_ or `AppImages`_ sections down below
-if a package is not available for your distro or platform, or if it's out of date.
 
 .. _Arch Linux: https://www.archlinux.org/packages/community/any/streamlink/
 .. _Arch Linux (aur, git): https://aur.archlinux.org/packages/streamlink-git/
@@ -149,9 +148,8 @@ if a package is not available for your distro or platform, or if it's out of dat
 .. _Gentoo Linux: https://packages.gentoo.org/package/net-misc/streamlink
 .. _NetBSD (pkgsrc): https://pkgsrc.se/multimedia/streamlink
 .. _NixOS: https://github.com/NixOS/nixpkgs/tree/master/pkgs/applications/video/streamlink
-.. _OpenBSD: https://openports.se/multimedia/streamlink
+.. _openSUSE: https://build.opensuse.org/package/show/multimedia:apps/streamlink
 .. _Solus: https://dev.getsol.us/source/streamlink/
-.. _Ubuntu: https://launchpad.net/~nilarimogard/+archive/ubuntu/webupd8/+packages?field.name_filter=streamlink&field.status_filter=published&field.series_filter=
 .. _Void: https://github.com/void-linux/void-packages/tree/master/srcpkgs/streamlink
 
 .. _Installing AUR packages: https://wiki.archlinux.org/index.php/Arch_User_Repository#Installing_packages
@@ -175,13 +173,30 @@ Fedora                               Mohamed El Morabity <melmorabity at fedorap
 Gentoo                               soredake <fdsfgs at krutt.org>
 NetBSD                               Maya Rashish <maya at netbsd.org>
 NixOS                                Tuomas Tynkkynen <tuomas.tynkkynen at iki.fi>
-OpenBSD                              Brian Callahan <bcallah at openbsd.org>
+openSUSE                             Simon Puchert <simonpuchert at alice.de>
 Solus                                Joey Riches <josephriches at gmail.com>
-Ubuntu                               Alin Andrei <andrew at webupd8.org>
 Void                                 Michal Vasilek <michal at vasilek.cz>
-Windows binaries                     beardypig <beardypig at protonmail.com>
-Windows port. version                beardypig <beardypig at protonmail.com>
+Windows binaries                     Sebastian Meyer <mail at bastimeyer.de>
+Linux AppImages                      Sebastian Meyer <mail at bastimeyer.de>
 ==================================== ===========================================
+
+
+Package availability
+--------------------
+
+Packaging is not done by the Streamlink maintainers themselves except for
+the `PyPI package <PyPI package and source code_>`_,
+the `Windows installers + portable builds <Windows binaries_>`_,
+and the `Linux AppImages <AppImages_>`_.
+
+If a packaged release of Streamlink is not available for your operating system / distro or your system's architecture,
+or if it's out of date or broken, then please contact the respective package maintainers or package-repository maintainers
+of your operating system / distro, as it's up to them to add, update, or fix those packages.
+
+Users of glibc-based Linux distros can find up-to-date Streamlink releases via the available `AppImages`_.
+
+Please open an issue or pull request on GitHub if an **available**, **maintained** and **up-to-date** package is missing
+from the install docs.
 
 
 PyPI package and source code
@@ -274,34 +289,43 @@ Dependencies
 
 To install Streamlink from source you will need these dependencies.
 
-.. rst-class:: table-custom-layout
+Since :ref:`4.0.0 <changelog:streamlink 4.0.0 (2022-05-01)>`,
+Streamlink defines a `build system <pyproject.toml_>`__ according to `PEP-517`_ / `PEP-518`_.
 
-==================================== ===========================================
-Name                                 Notes
-==================================== ===========================================
-`Python`_                            At least version **3.6**.
-`python-setuptools`_                 At least version **42.0.0**.
+.. rst-class:: table-custom-layout table-custom-layout-dependencies
 
-**Automatically installed by the setup script**
---------------------------------------------------------------------------------
-`isodate`_                           Used for parsing ISO8601 strings
-`lxml`_                              Used for processing HTML and XML data
-`pycountry`_                         Used for localization settings, provides country and language data
-`pycryptodome`_                      Used for decrypting encrypted streams
-`PySocks`_                           Used for SOCKS Proxies
-`requests`_                          Used for making any kind of HTTP/HTTPS request
-`websocket-client`_                  Used for making websocket connections
+========= ========================= ===========================================
+Type      Name                       Notes
+========= ========================= ===========================================
+python    `Python`_                 At least version **3.7**.
 
-**Optional**
---------------------------------------------------------------------------------
-`ffmpeg`_                            Required for `muxing`_ multiple video/audio/subtitle streams into a single output stream.
+build     `setuptools`_             At least version **45.0.0**. |br| Used as build backend.
+build     `wheel`_                  Used by the build frontend for creating Python wheels.
+build     `versioningit`_           At least version **2.0.0**. |br| Used for generating the version string from git
+                                    when building, or when running in an editable install.
+
+runtime   `isodate`_                Used for parsing ISO8601 strings
+runtime   `lxml`_                   Used for processing HTML and XML data
+runtime   `pycountry`_              Used for localization settings, provides country and language data
+runtime   `pycryptodome`_           Used for decrypting encrypted streams
+runtime   `PySocks`_                Used for SOCKS Proxies
+runtime   `requests`_               Used for making any kind of HTTP/HTTPS request
+runtime   `websocket-client`_       Used for making websocket connections
+
+optional  `FFmpeg`_                 Required for `muxing`_ multiple video/audio/subtitle streams into a single output stream.
 
                                      - DASH streams with video and audio content always have to get remuxed.
                                      - HLS streams optionally need to get remuxed depending on the stream selection.
-==================================== ===========================================
+========= ========================= ===========================================
+
+.. _pyproject.toml: https://github.com/streamlink/streamlink/blob/master/pyproject.toml
+.. _PEP-517: https://peps.python.org/pep-0517/
+.. _PEP-518: https://peps.python.org/pep-0518/
 
 .. _Python: https://www.python.org/
-.. _python-setuptools: https://setuptools.pypa.io/en/latest/
+.. _setuptools: https://setuptools.pypa.io/en/latest/
+.. _wheel: https://wheel.readthedocs.io/en/stable/
+.. _versioningit: https://versioningit.readthedocs.io/en/stable/
 
 .. _isodate: https://pypi.org/project/isodate/
 .. _lxml: https://lxml.de/
@@ -311,75 +335,51 @@ Name                                 Notes
 .. _requests: https://docs.python-requests.org/en/master/
 .. _websocket-client: https://pypi.org/project/websocket-client/
 
-.. _ffmpeg: https://www.ffmpeg.org/
+.. _FFmpeg: https://www.ffmpeg.org/
 .. _muxing: https://en.wikipedia.org/wiki/Multiplexing#Video_processing
 
 
 Windows binaries
 ----------------
 
-.. rst-class:: table-custom-layout
+Windows installers and portable builds for Streamlink can be found at `streamlink/windows-builds`_,
+with support for different architectures and different Python versions.
 
-==================================== ====================================
-Release                              Notes
-==================================== ====================================
-`Stable release`_                    Download the installer from the `GitHub releases page`_.
+These installers and portable builds contain:
 
-`Development build`_                 For testing purposes only! Built each day at midnight (UTC). |br|
-                                     Download the zipped installer from the `build artifacts`_ section of one of
-                                     the recent scheduled builds. Build artifacts are stored by Github for 90 days. |br|
-                                     See the `commit log`_ for a list of changes since the last stable release.
-==================================== ====================================
+- an embedded Python version, built at `streamlink/python-windows-embed`_
+- Streamlink and its dependencies
+- FFmpeg, required for muxing streams, built at `streamlink/FFmpeg-Builds`_
 
-.. warning::
+and they are available in the following flavors:
 
-    **The Streamlink installer for Windows is currently based on Python 3.9.** |br|
-    Versions of Windows prior to 10 are **not** supported.
+- Python 3.10 - x86_64 (64 bit)
+- Python 3.10 - x86 (32 bit)
+- Python 3.8 - x86_64 (64 bit) - for Windows 7
+- Python 3.8 - x86 (32 bit) - for Windows 7
 
-    Be aware that the packages for `Chocolatey`_ and the `Windows Package Manager`_ are just wrappers
-    around the stable installer and thus depend on Windows 10+ as well.
+For further information, please see the README in the `streamlink/windows-builds`_ repository.
 
-    Alternatively, :ref:`Streamlink can be installed via python-pip <install:PyPI package and source code>`
-    in a :ref:`compatible Python environment <install:Dependencies>`.
+Windows stable builds
+^^^^^^^^^^^^^^^^^^^^^
 
-.. _Stable release:
-.. _GitHub releases page: https://github.com/streamlink/streamlink/releases/latest
-.. _Development build:
-.. _build artifacts: https://github.com/streamlink/streamlink/actions?query=event%3Aschedule+is%3Asuccess+branch%3Amaster
-.. _commit log: https://github.com/streamlink/streamlink/commits/master
+Stable installers and stable portable builds of Streamlink's latest release can be
+`downloaded from the releases page of the streamlink/windows-builds <windows-stable_>`_ repository.
 
-These installers contain:
+Windows nightly builds
+^^^^^^^^^^^^^^^^^^^^^^
 
-- A compiled version of Streamlink that **does not require an existing Python installation**
-- `ffmpeg`_ for muxing streams
+Built once each day at midnight UTC from Streamlink's master branch. |br|
+This includes the most recent changes, but is not considered "stable". |br|
+Download from the build-artifacts of the `scheduled nightly build runs <windows-nightly_>`_ (requires a GitHub login). |br|
+See the `commit log <streamlink-master_>`_ of Steamlink's master branch for all the recent changes.
 
-and perform the following tasks:
-
-- Add Streamlink to the system's list of installed applications. |br|
-  An uninstaller will automatically be created during installation.
-- Add Streamlink's installation directory to the system's ``PATH`` environment variable. |br|
-  This allows the user to run the ``streamlink`` command globally
-  from the command prompt or powershell without specifying its directory.
-
-To build the installer on your own, ``NSIS`` and ``pynsist`` need to be installed.
-
-
-Windows portable version
-^^^^^^^^^^^^^^^^^^^^^^^^
-
-.. rst-class:: table-custom-layout
-
-==================================== ===========================================
-Maintainer                           Links
-==================================== ===========================================
-Beardypig                            `Latest precompiled stable release`__ |br|
-                                     `Latest builder`__ |br|
-                                     `More info`__
-==================================== ===========================================
-
-__ https://github.com/beardypig/streamlink-portable/releases/latest
-__ https://github.com/beardypig/streamlink-portable/archive/master.zip
-__ https://github.com/beardypig/streamlink-portable
+.. _streamlink/windows-builds: https://github.com/streamlink/windows-builds
+.. _streamlink/python-windows-embed: https://github.com/streamlink/python-windows-embed
+.. _streamlink/FFmpeg-Builds: https://github.com/streamlink/FFmpeg-Builds
+.. _windows-stable: https://github.com/streamlink/windows-builds/releases
+.. _windows-nightly: https://github.com/streamlink/windows-builds/actions?query=event%3Aschedule+is%3Asuccess+branch%3Amaster
+.. _streamlink-master: https://github.com/streamlink/streamlink/commits/master
 
 
 AppImages
